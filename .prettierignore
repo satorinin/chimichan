@@ -3,3 +3,5 @@ web/dist
 dist
 coverage
 *.min.js
+web/vendor/kuromoji.js
+web/vendor/

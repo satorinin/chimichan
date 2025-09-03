@@ -3,7 +3,7 @@ export function escapeHtml(s: string) {
     '&': '&amp;',
     '<': '&lt;',
     '>': '&gt;',
-    '"': '&quot;'
+    '"': '&quot;',
   };
   return s.replace(/[&<>"]/g, (c) => map[c] ?? c);
 }

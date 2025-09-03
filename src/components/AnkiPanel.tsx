@@ -1,4 +1,4 @@
-import React from 'react'
+import React from 'react';
 
 export default function AnkiPanel() {
   return (
@@ -6,5 +6,5 @@ export default function AnkiPanel() {
       <h4>Anki</h4>
       <p>Connect to Anki via AnkiConnect — UI coming soon.</p>
     </div>
-  )
+  );
 }

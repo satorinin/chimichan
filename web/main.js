@@ -9,7 +9,9 @@ const format = document.getElementById('format');
 // Default dictionary path — vendored locally under web/vendor/dict for offline/extension usage
 const dicPath = './vendor/dict/';
 
-const setStatus = (s) => { status.textContent = s; };
+const setStatus = (s) => {
+  status.textContent = s;
+};
 
 // Theme handling removed — single neutral theme in CSS
 
@@ -31,84 +33,87 @@ if (!window.kuromoji || !kuromoji.builder) {
 
     const render = (tokens) => {
       // remember last tokens so we can re-render when format changes
-      render.lastTokens = tokens
+      render.lastTokens = tokens;
       // also keep a top-level reference for other handlers
-      lastTokens = tokens
-      
+      lastTokens = tokens;
+
       if (format.value === 'json') {
         // pretty JSON in a monospace block
-        result.innerHTML = ''
-        const pre = document.createElement('pre')
-        pre.className = 'json-output'
-        pre.textContent = JSON.stringify(tokens, null, 2)
-        result.appendChild(pre)
+        result.innerHTML = '';
+        const pre = document.createElement('pre');
+        pre.className = 'json-output';
+        pre.textContent = JSON.stringify(tokens, null, 2);
+        result.appendChild(pre);
       } else {
         if (!tokens || tokens.length === 0) {
-          result.textContent = '(no tokens)'
-          return
+          result.textContent = '(no tokens)';
+          return;
         }
 
         // Use the keys of the first token as column labels
-        const headers = Object.keys(tokens[0])
+        const headers = Object.keys(tokens[0]);
 
         // Compose rows: first a header row, then one row per token
-        const rows = []
-        rows.push(headers.join('\t'))
+        const rows = [];
+        rows.push(headers.join('\t'));
         for (const t of tokens) {
-          const cols = headers.map(k => {
-            const v = t[k]
-            if (v === null || v === undefined) return '-'
-            if (typeof v === 'object') return JSON.stringify(v)
-            return String(v)
-          })
-          rows.push(cols.join('\t'))
+          const cols = headers.map((k) => {
+            const v = t[k];
+            if (v === null || v === undefined) return '-';
+            if (typeof v === 'object') return JSON.stringify(v);
+            return String(v);
+          });
+          rows.push(cols.join('\t'));
         }
 
         // render HTML table
-        const container = document.createElement('div')
-        container.className = 'tokens-table-container'
-        const table = document.createElement('table')
-        table.className = 'tokens-table'
-        const thead = document.createElement('thead')
-        const trh = document.createElement('tr')
+        const container = document.createElement('div');
+        container.className = 'tokens-table-container';
+        const table = document.createElement('table');
+        table.className = 'tokens-table';
+        const thead = document.createElement('thead');
+        const trh = document.createElement('tr');
         for (const h of headers) {
-          const th = document.createElement('th')
-          th.textContent = h
-          trh.appendChild(th)
+          const th = document.createElement('th');
+          th.textContent = h;
+          trh.appendChild(th);
         }
-        thead.appendChild(trh)
-        table.appendChild(thead)
-        const tbody = document.createElement('tbody')
+        thead.appendChild(trh);
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
         for (const t of tokens) {
-          const tr = document.createElement('tr')
+          const tr = document.createElement('tr');
           for (const k of headers) {
-            const td = document.createElement('td')
-            const v = t[k]
-            if (v === null || v === undefined) td.textContent = '-'
-            else if (typeof v === 'object') td.textContent = JSON.stringify(v)
-            else td.textContent = String(v)
-            tr.appendChild(td)
+            const td = document.createElement('td');
+            const v = t[k];
+            if (v === null || v === undefined) td.textContent = '-';
+            else if (typeof v === 'object') td.textContent = JSON.stringify(v);
+            else td.textContent = String(v);
+            tr.appendChild(td);
           }
-          tbody.appendChild(tr)
+          tbody.appendChild(tr);
         }
-        table.appendChild(tbody)
-        container.appendChild(table)
-        result.innerHTML = ''
-        result.appendChild(container)
+        table.appendChild(tbody);
+        container.appendChild(table);
+        result.innerHTML = '';
+        result.appendChild(container);
       }
     };
 
     // store last tokens in closure scope
-    let lastTokens = null
+    let lastTokens = null;
 
     // when the user changes the output format, re-render the most recent tokens
     format.addEventListener('change', () => {
-      if (lastTokens) render(lastTokens)
-    })
+      if (lastTokens) render(lastTokens);
+    });
 
     parseBtn.addEventListener('click', () => {
       const text = input.value || '';
-      if (!text.trim()) { result.textContent = '(no input)'; return; }
+      if (!text.trim()) {
+        result.textContent = '(no input)';
+        return;
+      }
 
       try {
         setStatus('Tokenizing…');
@@ -128,66 +133,68 @@ if (!window.kuromoji || !kuromoji.builder) {
 
     // Debounce helper
     const debounce = (fn, wait = 300) => {
-      let t = null
+      let t = null;
       return (...args) => {
-        if (t) clearTimeout(t)
-        t = setTimeout(() => fn(...args), wait)
-      }
-    }
+        if (t) clearTimeout(t);
+        t = setTimeout(() => fn(...args), wait);
+      };
+    };
 
     // Auto-parse input on change (debounced)
     const autoParse = debounce(() => {
-      const text = input.value || ''
-      if (!text.trim()) { result.textContent = '(no input)'; return }
-      try {
-        setStatus('Auto-tokenizing…')
-        const tokens = tokenizer.tokenize(text)
-        render(tokens)
-        setStatus('Done — ' + tokens.length + ' tokens')
-      } catch (e) {
-        setStatus('Auto-tokenization failed')
+      const text = input.value || '';
+      if (!text.trim()) {
+        result.textContent = '(no input)';
+        return;
       }
-    }, 300)
+      try {
+        setStatus('Auto-tokenizing…');
+        const tokens = tokenizer.tokenize(text);
+        render(tokens);
+        setStatus('Done — ' + tokens.length + ' tokens');
+      } catch (e) {
+        setStatus('Auto-tokenization failed');
+      }
+    }, 300);
 
-    input.addEventListener('input', autoParse)
+    input.addEventListener('input', autoParse);
 
     // Optional: auto-parse window selection when checkbox enabled
-    const autoSelBox = document.getElementById('autoSelection')
-    let lastSelection = ''
+    const autoSelBox = document.getElementById('autoSelection');
+    let lastSelection = '';
 
     // Helper: determine whether given node is inside our app UI
     function isInsideApp(node) {
       try {
-        const app = document.getElementById('app')
-        return app && app.contains(node)
+        const app = document.getElementById('app');
+        return app && app.contains(node);
       } catch (e) {
-        return false
+        return false;
       }
     }
 
     const checkSelection = debounce(() => {
-      if (!autoSelBox || !autoSelBox.checked) return
-      const selObj = window.getSelection && window.getSelection()
-      const sel = selObj && selObj.toString && selObj.toString().trim()
-      if (!sel) return
+      if (!autoSelBox || !autoSelBox.checked) return;
+      const selObj = window.getSelection && window.getSelection();
+      const sel = selObj && selObj.toString && selObj.toString().trim();
+      if (!sel) return;
 
       // ignore selection if it's entirely inside our app UI (prevents loops)
-      const anchor = selObj.anchorNode
-      if (anchor && isInsideApp(anchor)) return
+      const anchor = selObj.anchorNode;
+      if (anchor && isInsideApp(anchor)) return;
 
       if (sel && sel !== lastSelection) {
-        lastSelection = sel
-        input.value = sel
-        autoParse()
+        lastSelection = sel;
+        input.value = sel;
+        autoParse();
       }
-    }, 200)
+    }, 200);
 
-    document.addEventListener('selectionchange', checkSelection)
+    document.addEventListener('selectionchange', checkSelection);
 
     // Auto-parse initial textarea content so page shows tokens once ready
     if (input && input.value && input.value.trim()) {
-      autoParse()
+      autoParse();
     }
   });
 }
-
