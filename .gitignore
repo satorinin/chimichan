@@ -1,0 +1,41 @@
+node_modules/
+web/dist/
+dist/
+.DS_Store
+build/
+/.cache
+# Node modules
+node_modules/
+
+# Build output
+dist/
+
+# Logs
+*.log
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+
+# Misc
+.env
+
+# Kuromoji dictionary (downloaded/copied into public during setup)
+public/kuromoji-dict/
+
+# Package artifacts / archives
+*.tgz
+
+# Vite / cache
+.vite/
+.cache/
+
+# Editor swap/temp
+*.swp

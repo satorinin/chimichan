@@ -33,9 +33,9 @@
   <h3>Result</h3>
   <pre id="result">(waiting for tokenizer)</pre>
 
-  <!-- Load kuromoji from unpkg. We use @latest so maintainers don't need to pin a version here. -->
-  <script src="https://unpkg.com/kuromoji@latest/build/kuromoji.js"></script>
-  <!-- Load our app as an ES module. We keep kuromoji as a global loaded above. -->
+  <!-- Load vendored kuromoji and dictionaries so the demo can run offline/inside an extension. -->
+  <script src="./vendor/kuromoji.js"></script>
+  <!-- Load our app as an ES module. kuromoji is exposed as a global by the vendored file. -->
   <script type="module" src="./main.js"></script>
 </body>
 </html>

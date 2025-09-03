@@ -6,12 +6,12 @@ const input = document.getElementById('input');
 const result = document.getElementById('result');
 const format = document.getElementById('format');
 
-// Default dictionary path served from unpkg's kuromoji package
-const dicPath = 'https://unpkg.com/kuromoji@latest/dict/';
+// Default dictionary path — vendored locally under web/vendor/dict for offline/extension usage
+const dicPath = './vendor/dict/';
 
 const setStatus = (s) => { status.textContent = s; };
 
-setStatus('Initializing kuromoji builder…');
+setStatus('Initializing kuromoji builder (offline vendor mode)…');
 
 if (!window.kuromoji || !kuromoji.builder) {
   setStatus('kuromoji.js not found on page. Check the script include.');
