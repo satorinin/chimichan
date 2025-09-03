@@ -13,6 +13,74 @@ const setStatus = (s) => {
   status.textContent = s;
 };
 
+// AnkiConnect helper (browser UI wrapper)
+const ankiAddressEl = document.getElementById('ankiAddress');
+const ankiFetchBtn = document.getElementById('ankiFetch');
+const ankiStatus = document.getElementById('ankiStatus');
+const ankiDecks = document.getElementById('ankiDecks');
+
+const ANKI_KEY = 'chimichan:anki';
+const defaultAnkiUrl = 'http://127.0.0.1:8765';
+
+function loadSavedAnki() {
+  try {
+    const v = localStorage.getItem(ANKI_KEY);
+    if (v) ankiAddressEl.value = v;
+    else ankiAddressEl.value = defaultAnkiUrl;
+  } catch (e) {
+    ankiAddressEl.value = defaultAnkiUrl;
+  }
+}
+
+function saveAnkiAddress() {
+  try {
+    localStorage.setItem(ANKI_KEY, ankiAddressEl.value);
+  } catch (e) {}
+}
+
+async function ankiRequest(url, action, params = {}) {
+  const body = { action, version: 6, params };
+  ankiStatus.textContent = 'Anki: requesting…';
+  try {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error('network ' + res.status);
+    const json = await res.json();
+    if (json.error) throw new Error(String(json.error));
+    ankiStatus.textContent = 'Anki: ok';
+    return json.result;
+  } catch (e) {
+    ankiStatus.textContent = 'Anki: error';
+    throw e;
+  }
+}
+
+async function fetchDecks() {
+  const url = (ankiAddressEl.value && ankiAddressEl.value.trim()) || defaultAnkiUrl;
+  saveAnkiAddress();
+  try {
+    const decks = await ankiRequest(url, 'deckNames', {});
+    // clear and populate
+    ankiDecks.innerHTML = '';
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = '(choose a deck)';
+    ankiDecks.appendChild(empty);
+    for (const d of decks) {
+      const o = document.createElement('option');
+      o.value = d;
+      o.textContent = d;
+      ankiDecks.appendChild(o);
+    }
+    ankiStatus.textContent = 'Anki: decks loaded';
+  } catch (e) {
+    ankiStatus.textContent = 'Anki: failed to load decks';
+    console.error('Anki error', e);
+  }
+}
+
+loadSavedAnki();
+ankiFetchBtn.addEventListener('click', fetchDecks);
+
 // Theme handling removed — single neutral theme in CSS
 
 setStatus('Initializing kuromoji builder (offline vendor mode)…');

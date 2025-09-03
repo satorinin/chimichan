@@ -38,3 +38,11 @@ export async function ankiRequest(
   if (json.error) throw new Error(String(json.error));
   return json.result;
 }
+
+export const DEFAULT_ANKI_URL = 'http://127.0.0.1:8765';
+
+export async function getDeckNames(url: string = DEFAULT_ANKI_URL): Promise<string[]> {
+  const res = await ankiRequest(url, 'deckNames', {});
+  // AnkiConnect returns an array of deck names on success
+  return Array.isArray(res) ? res : [];
+}

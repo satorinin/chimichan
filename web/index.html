@@ -65,6 +65,13 @@
           <option value="json" selected>JSON (pretty)</option>
           <option value="table">Table (simple)</option>
   </select>
+        <!-- AnkiConnect controls -->
+        <label style="display:flex; align-items:center; gap:6px; margin-left:6px;">
+          <input id="ankiAddress" type="text" style="width:220px; padding:6px; border-radius:6px; border:1px solid var(--glass)" placeholder="http://127.0.0.1:8765" />
+        </label>
+        <button id="ankiFetch" title="Fetch decks from AnkiConnect">Fetch decks</button>
+        <span id="ankiStatus" class="status-badge" aria-live="polite">Anki: idle</span>
+        <select id="ankiDecks" style="margin-left:6px"><option value="">(no deck)</option></select>
       </div>
     </div>
 
