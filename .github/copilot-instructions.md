@@ -1,56 +1,50 @@
-# Copilot Instructions — Chimichan Repository
+# Copilot Instructions — Chimichan (concise guide)
 
-## Purpose
-Provide AI coding agents with the essential knowledge to be productive in this codebase, including architecture, workflows, conventions, and integration points.
+Purpose: help an AI coding agent become productive quickly by highlighting the project's architecture, key files, developer workflows, conventions, and integration points.
 
-## Overview
-- **Big Picture:** Chimichan is a project focused on parsing, CLI tools, and integration with Anki and Firebase. It aims to replicate features from the Migaku Chrome extension, such as furigana, pitch coloring, and interactive text.
-- **Key Directories:**
-  - `src/`: Main source code for parsing and CLI tools.
-  - `tools/`: Utility scripts, including Firebase integration.
-  - `docs/`: Documentation, including `master_design.md` for architecture and planning.
+Quick pointers (what to open first):
+- `docs/master_design.md` — overall architecture & planned build
+- `docs/language_parser_pipeline.md` — the parsing responsibilities and token shape
+- `src/` — parser logic (entry points include `src/parser_pipeline.js` and other parser modules)
+- `docs/anki_syncer.md` and `src/cli_download_srs.py` — Anki-related workflows
 
-## Key Files
-- `src/lexor/parser.ts`: Tokenization and parsing logic.
-- `src/parser.ts`: High-level parsing utilities.
-- `src/cli_download_srs.py`: CLI tool for Anki integration.
-- `tools/firebase_viewer_server.py`: Firebase utility script.
+Key concepts and architecture:
+- Chimichan centers on a language parsing pipeline that tokenizes text, performs morphological analysis, and emits tokens used by a language decorator (furigana, pitch coloring, unknown-word detection).
+- Data flow: input text -> sentence/word segmentation -> morphological analysis (kuromoji or similar) -> token enrichment (reading, lemma, POS, pitch) -> downstream consumers (CLI, Anki sync, UI).
+- Token contract (used across the codebase): {surface, reading, lemma, pos, start, end} — keep this shape when adding helpers or tests.
 
-## Developer Workflows
-- **Building and Running:**
-  - The project plans to use Bazel for builds and tests. Refer to `docs/master_design.md` for target names and setup.
-- **Testing:**
-  - Add unit tests for tokenization and Anki client logic.
-- **Debugging:**
-  - Use browser devtools for content scripts.
-  - Use VS Code for debugging TypeScript and Python files.
+Developer workflows and how to run things (discoverable patterns):
+- There is no enforced build system checked into the repo; docs mention Bazel as the planned build/test tool. Before adding Bazel scaffolding, confirm with the maintainers. For small changes:
+  - Run JS/Node scripts directly with `node` (e.g., `node src/parser_pipeline.js`).
+  - Run Python CLI scripts with `python3` (they follow a `main()` + `argparse` pattern).
+- Tests: the repo currently lacks a unified test harness. When adding tests, prefer small, focused unit tests next to the module under test and use a lightweight runner (Node: Jest/Mocha; Python: pytest). Add a `README` test snippet.
 
-## Project-Specific Conventions
-- **Python CLI Scripts:**
-  - Follow `main()` + `argparse` patterns.
-  - Use SQLite cursors for database interactions (see `cli_download_srs.py`).
-- **TypeScript Parsing Utilities:**
-  - Keep functions small, pure, and testable.
-  - Return token shapes: `{surface, reading, lemma, pos, start, end}`.
-- **Anki Integration:**
-  - Use AnkiConnect JSON-RPC at `http://127.0.0.1:8765`.
-  - Provide `--host`/`--port` overrides in client modules.
+Project-specific conventions and examples:
+- Parser utilities: keep functions small and pure; prefer returning normalized token objects rather than mutating input.
+- CLI scripts: use `if __name__ == '__main__': main()` and `argparse` flags. Example: `src/cli_download_srs.py` (look for `--host`/`--port` overrides for AnkiConnect).
+- Anki integration: uses AnkiConnect JSON-RPC at `http://127.0.0.1:8765`. Client modules should allow `--host`/`--port` overrides and interact with methods like `findNotes`, `notesInfo`, and `addNote`.
+- Pitch data: stored as a local JSON keyed by lemma/reading and referenced by tokens via fields such as `pitchPatternId` and `pitchColor` (see `docs/word_database.md`).
 
-## Integration Points
-- **AnkiConnect:**
-  - Methods: `findNotes`, `notesInfo`, `addNote`.
-  - Return plain arrays of word keys with optional metadata.
-- **Pitch Data:**
-  - Use a local JSON database keyed by lemma/reading.
-  - Annotate tokens with `pitchPatternId` and `pitchColor`.
+Integration points and external deps to be aware of:
+- AnkiConnect (local HTTP JSON-RPC)
+- kuromoji or equivalent for Japanese morphological analysis (the docs reference it; search `package.json` or `requirements.txt` before adding it)
+- Firebase utilities live under `tools/` (e.g. `tools/firebase_viewer_server.py`) — inspect before changing.
 
-## First Tasks for AI Agents
-1. Read `docs/master_design.md` for architecture and workflows.
-2. Inspect key files listed above to understand parsing and integration patterns.
-3. Scaffold Bazel `WORKSPACE` and `BUILD.bazel` files for `//src:web_app` and `//tools:firebase_viewer_server`.
-4. Add unit tests for tokenization helpers and Anki client logic.
-5. Document AnkiConnect usage examples in `docs/dev-setup.md`.
+Practical first tasks for an AI agent:
+1. Read `docs/master_design.md` and `docs/language_parser_pipeline.md` to confirm architecture assumptions.
+2. Run a parser script (e.g., `node src/parser_pipeline.js`) with a small sample to observe token output shape.
+3. Add a unit test for a tokenization helper that asserts the token contract.
+4. If adding CI or build scaffolding, open an issue first — the project plans Bazel but currently has no enforced configuration.
 
-## Notes
-- Preserve privacy: Do not upload Anki deck contents or user data without explicit consent.
-- Update this file as the project evolves to reflect new patterns and workflows.
+Hints and constraints:
+- Preserve user privacy: never include or upload real Anki deck data.
+- When editing parser code, keep the token shape stable and add backward-compatible enrichment fields.
+- Prefer small, verifiable changes: run a minimal smoke test (node/python run) and add one unit test.
+
+Where to update this file: keep it short and focused — expand only with concrete, discoverable patterns and commands.
+
+Questions for maintainers / next steps:
+- Confirm intended build tool (Bazel vs simple scripts).
+- Point to any existing test runner preferences (Jest/pytest) if available.
+
+If anything here is unclear or you want the file to be more prescriptive (example commands, exact test framework, or added CI scaffolding), tell me which section to expand.

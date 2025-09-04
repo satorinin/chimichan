@@ -1,4 +1,90 @@
-```markdown
+# Chimichan — Master Design and Requirements
+
+## System Overview
+
+The Chimichan system processes Japanese text to provide annotations (furigana, pitch coloring, unknown words) and comprehension metrics. The system consists of the following components:
+
+1. **Parser Pipeline**: Converts input text into tokens with morphology metadata.
+2. **WordDB**: Stores the user's known, learning, and new words for lookups.
+3. **Comprehension Calculator**: Computes comprehension metrics and identifies n+1 sentences.
+4. **Language Decorator**: Applies annotations (furigana, pitch, underlines) to tokens.
+5. **Anki Syncer**: Fetches known/learning/new words from AnkiConnect.
+6. **UI and Extension**: Provides user controls and displays annotations.
+7. **Dictionary Loader and Yomitan Dictionaries**: Classifies tokens and adds pitch accents using Yomitan dictionary data.
+
+### Data Flow
+
+```mermaid
+flowchart LR
+  Input[Input Text] --> Parser[Parser Pipeline]
+  Parser --> DictionaryLoader[Dictionary Loader]
+  DictionaryLoader --> WordDB
+  DictionaryLoader --> Parser
+  Parser --> Comprehension[Comprehension Calculator]
+  WordDB --> Comprehension
+  Comprehension --> Decorator[Language Decorator]
+  Comprehension --> UI[User Interface]
+```
+
+## Testing Strategy
+
+### Unit Tests
+- Each component should have unit tests for its core functionality:
+  - Parser pipeline: validate token contract for sample sentences.
+  - WordDB: CRUD operations and batch imports.
+  - Comprehension calculator: scoring logic and n+1 detection.
+
+### Integration Tests
+- Validate end-to-end data flows:
+  - Parser -> WordDB -> Comprehension calculator -> Decorator -> UI.
+  - Anki Syncer -> WordDB.
+
+### Performance Tests
+- Ensure the system can handle large datasets:
+  - Parse and annotate 10k tokens in under 500ms.
+  - Import 10k Anki words in under 2s.
+
+### Tools
+- Preferred frameworks:
+  - JavaScript: Jest or Mocha.
+  - Python: pytest.
+
+## Glossary of Terms
+
+- **Token**: A unit of text with metadata (e.g., `{surface, reading, lemma, pos, start, end}`).
+- **WordDB**: A local database storing the user's known, learning, and new words.
+- **ComprehensionReport**: A summary of comprehension metrics for a page, including known word percentages and n+1 sentences.
+- **n+1 Sentence**: A sentence with exactly one unknown token, making it a good candidate for learning.
+- **Pitch Pattern**: A representation of pitch accent for a word (e.g., `HLL`).
+- **Yomitan Dictionary**: A JSON-based dictionary format containing word metadata (surface, reading, lemma, POS) and pitch accent patterns.
+- **Dictionary Loader**: A module that ingests Yomitan dictionaries and provides token classification and pitch accent data.
+
+## Open Questions
+
+1. How will pitch DB updates be handled for improvements (automatic updater vs user-installed updates)?
+2. Furigana rendering: prefer semantic `<ruby>` by default; confirm fallback UX for sites that break layout.
+3. Comprehension UX: what thresholds trigger "fully-known" sentence highlighting vs "mostly-known" suggestions?
+4. Offline fallback: if AnkiConnect is unreachable, should the extension still run in read-only mode using cached WordDB?
+5. Security: sign extension packages and document how to add user-provided pitch files safely.
+6. How should the system handle conflicting entries in Yomitan dictionaries (e.g., multiple readings or pitch patterns for the same surface form)?
+7. Should the dictionary loader support user-defined dictionaries, and if so, how will conflicts with system dictionaries be resolved?
+
+## Timeline Alignment
+
+### Week 0–1
+- Implement parser pipeline and unit tests.
+- Create minimal decorator harness.
+
+### Week 1–2
+- Add comprehension calculator and integrate with parser pipeline.
+- Implement WordDB with IndexedDB adapter.
+
+### Week 2–3
+- Add Anki Syncer and batch import functionality.
+- Finalize UI and extension integration.
+
+---
+
 # Chimichan — Master Design and Requirements
 
 Status (repo snapshot: 2025-09-04)
@@ -104,10 +190,21 @@ Core components and explicit requirements
   - Success criteria:
     - S8.1: A manual test that loading the harness and toggling settings changes decorator behavior as expected.
 
+9) Dictionary Loader and Yomitan Dictionaries
+  - Purpose: Classify tokens and add pitch accents using Yomitan dictionary data.
+  - Requirements:
+    - R9.1: Ingest Yomitan dictionaries in JSON format, mapping surface forms to readings, lemmas, POS, and pitch accents.
+    - R9.2: Provide lookup methods for surface-to-reading mappings, lemma resolution, and POS tagging.
+    - R9.3: Offer pitch accent retrieval for tokens based on their lemma and reading.
+  - Success criteria:
+    - S9.1: Dictionary loader unit tests validate ingestion and lookup for sample Yomitan dictionaries.
+    - S9.2: Integration tests verify that parsed tokens are correctly classified and enriched with pitch data.
+
 Interfaces between components
 - Parser -> Decorator/Comprehension: Sentence[] of Token objects (stable contract). Keep this shape backward compatible.
 - Anki Syncer -> WordDB: exports arrays of normalized words with status.
 - Pitch DB -> Decorator: pattern lookup by lemma/reading.
+- Dictionary Loader -> Parser: surface-to-reading mappings and pitch accent data.
 
 Testing and verification
 - Unit tests for core pure functions (parser normalization, comprehension scoring, DB importers).
@@ -342,6 +439,8 @@ Scaffolding notes: add `WORKSPACE`, minimal `BUILD.bazel` files for the above ta
 3. Comprehension UX: what thresholds trigger "fully-known" sentence highlighting vs "mostly-known" suggestions?
 4. Offline fallback: if AnkiConnect is unreachable, should the extension still run in read-only mode using cached WordDB?
 5. Security: sign extension packages and document how to add user-provided pitch files safely.
+6. How should the system handle conflicting entries in Yomitan dictionaries (e.g., multiple readings or pitch patterns for the same surface form)?
+7. Should the dictionary loader support user-defined dictionaries, and if so, how will conflicts with system dictionaries be resolved?
 
 ## Files to inspect / update first
 - `docs/` — read the per-component docs (listed above).
