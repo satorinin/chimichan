@@ -1,17 +1,23 @@
 # Chimichan — Master Design Document
 
-This document captures the high-level plan and component breakdown for an app that reproduces key features from the Migaku Chrome extension (furigana, pitch coloring, Anki integration, n+1 mining, sentence difficulty), starting as a SPA and later packaged as a browser extension.
+This document captures the high-level plan and component breakdown for an app that reproduces key features from the Migaku Chrome extension (furigana, pitch coloring, Anki integration, n+1 mining, sentence difficulty), starting as a SPA and later packaged as a browser extension. Recent additions: component-level docs have been added under `docs/` (see list below) and the extension is explicitly client-side first and only decorates pages when the user enables it.
+
+## Quick plan & checklist
+- [ ] Keep the app fully client-side where possible (no external CDNs/databases by default).
+- [ ] Extension decorates pages only when the user enables decorations for that page/site.
+- [ ] Use local pitch DB (JSON) and IndexedDB/SQLite for local persistence.
+- [ ] Implement the Comprehension Calculator in the content script pipeline.
 
 ## Goals
 - Provide selectable furigana behavior: None / All / Unknown / On hover.
 - Provide pitch-accent coloring: None / On hover / Always.
-- Make webpage text and subtitles interactive (hover, click, annotations).
+- Make webpage text and subtitles interactive (hover, click, annotations) only when the user enables decoration.
 - Integrate with Anki (AnkiConnect) to read known/learning/new words and sentence cards.
 - Underline unknown words, find n+1 sentences for mining, and compute per-sentence difficulty relative to a user's Anki knowledge.
 - Use Yomitan (or external popup) for dictionary popups; the app is not a flashcard or dictionary app.
 - Tokenize and parse Japanese sentences (Intl.Segmenter + kuromoji for morphology).
 - Use Bazel for builds and tests.
-- **Ensure the app is fully client-side, avoiding reliance on external CDNs or databases.**
+- Ensure the app is client-side first, avoiding reliance on external CDNs or databases unless explicitly opted-in by the user.
 
 ## High-level architecture
 
@@ -26,147 +32,146 @@ flowchart LR
   subgraph SPA
     Tokenizer[Sentence splitter: Intl.Segmenter]
     Morph[Tokenizer/morphology: kuromoji]
-    Annotator[Annotator: furigana/pitch/underline]
+    Decorator[Language Decorator: furigana / pitch / unknown]
+    Comprehend[Comprehension Calculator]
     UI[UI controls (settings panel)]
+  end
+
+  subgraph LocalData
+    WordDB[Known/Learning/New Word DB (IndexedDB/SQLite)]
+    PitchDB[Pitch data store (local JSON)]
   end
 
   subgraph Integrations
     Anki[AnkiConnect (127.0.0.1:8765)]
-    PitchDB[Pitch data store (local JSON)]
   end
 
   Page --> ContentScript
   ContentScript --> Tokenizer
   Tokenizer --> Morph
-  Morph --> Annotator
-  Annotator --> ContentScript
+  Morph --> Decorator
+  Decorator --> ContentScript
+  ContentScript --> Comprehend
+  Comprehend --> ContentScript
   ContentScript --> UI
   ContentScript <--> Anki
-  Annotator <--> PitchDB
+  Decorator <--> PitchDB
+  ContentScript <--> WordDB
   ContentScript --> Popup
 ```
 
-## Components and responsibilities
+Notes on behavior:
+- Decorations (furigana, pitch coloring, underlines) are applied only when the user toggles decoration for a page or site. This avoids surprising changes and respects user control.
+- The Comprehension Calculator runs locally in the content script and summarizes page comprehension using locally stored Anki-derived word lists; no data is sent to remote services by default.
 
-- Tokenization & Morphology
-  - Sentence splitting: use Intl.Segmenter where available for sentence and word boundaries.
-  - Morphological parsing: kuromoji (or other J/K tokenizer) to obtain lemma, reading (kana), POS, and base form.
-  - Output: tokens with {surface, reading, lemma, pos, start, end}.
-  - Files to reference: `src/lexor/parser.ts`, `src/parser.ts`.
+## Component index (documents under `docs/`)
+- `docs/user_view.md` — Single Page App UI and controls.
+- `docs/browser_extension_ui.md` — Extension packaging and how/when decorations are applied.
+- `docs/language_parser_pipeline.md` — Sentence splitting and morphology (Intl.Segmenter + kuromoji).
+- `docs/language_decorator.md` — Furigana, pitch, underline rendering rules.
+- `docs/anki_syncer.md` — AnkiConnect client and syncing rules.
+- `docs/word_database.md` — Local known/learning/new word DB (IndexedDB/SQLite).
+- `docs/comprehension_calculator.md` — Comprehension scoring and fully-known sentence detection.
 
-- Annotator (content script)
-  - Wrap tokens in spans with data attributes: data-surface, data-reading, data-pitch, data-status.
-  - Provide CSS hooks to render furigana (via <rt>/<ruby> or visually via CSS), pitch coloring, and underline unknown words.
-  - Support hover and click interactions that show Yomitan popup or Anki actions.
+(Inspect these docs for component-level requirements and open questions.)
 
-- Anki Integration
-  - Use AnkiConnect JSON-RPC (default http://127.0.0.1:8765) with overrides for host/port.
-  - Provide methods:
-    - getKnownWords(deckFilter?)
-    - getLearningWords(deckFilter?)
-    - getNewWords(deckFilter?)
-    - parseSentenceCards(deck?) -> extract words from sentence cards and mark them as known/learning.
-  - Reference: `src/cli_download_srs.py` for existing CLI patterns.
+## Components and responsibilities (summary)
 
-- Pitch accent data
-  - **Store pitch data locally** as a JSON database keyed by lemma/reading.
-  - Schema: {wordKey: {patternId, color, description}}. Annotator maps tokens to pitch patterns.
+- Tokenization & Morphology (`docs/language_parser_pipeline.md`)
+  - Sentence splitting with `Intl.Segmenter` (fallbacks noted in docs).
+  - Morphological parsing with kuromoji to obtain reading/lemma/POS.
+  - Emit tokens: `{surface, reading, lemma, pos, start, end}`.
 
-- N+1 mining & difficulty ranking
-  - For each sentence: compute known, learning, unknown counts using Anki lists.
-  - n+1 sentences are those with unknown count == 1.
-  - Difficulty score heuristic: ratio of unknown tokens, presence of low-frequency words, sentence length.
+- Language Decorator (`docs/language_decorator.md`)
+  - Render furigana per user setting (None/All/Unknown/On hover).
+  - Apply pitch accent coloring and underline unknown words.
+  - Use semantic `<ruby>/<rt>` where possible; provide CSS-only fallback for environments that limit markup.
 
-- UI & Settings
-  - Settings panel exposes Furigana mode, Pitch mode, Anki deck selection, Mining thresholds.
-  - Persist settings in localStorage / extension storage.
+- Comprehension Calculator (`docs/comprehension_calculator.md`)
+  - Compute metrics per page: percentage of known words, number of fully-known sentences, list of n+1 sentences.
+  - Scoring inputs: token statuses from WordDB, sentence tokenization from parser pipeline.
+  - Output: summary metrics and annotated highlights for fully-known sentences.
 
-- Backend (optional)
-  - **Avoid reliance on external backends.** If absolutely necessary, provide optional Firebase-compatible sync for advanced users.
+- Anki Syncer (`docs/anki_syncer.md`)
+  - Talk to AnkiConnect (JSON-RPC) to fetch deck notes and derive known/learning/new word lists.
+  - Support `--host`/`--port` overrides and local caching in WordDB.
 
-- Packaging
-  - Start as SPA (local dev) and produce a build artifact that can be used as a content-script+UI bundle for Extension Manifest V3.
+- Word Database (`docs/word_database.md`)
+  - Local persistence (IndexedDB in the extension, SQLite for CLI tools).
+  - Schema: `{word, status: known|learning|new, metadata}` and batch update methods.
 
-## Developer workflows
+- Pitch DB
+  - Local JSON shipped with the extension or loaded by the user into extension storage.
+  - Annotator maps tokens to `pitchPatternId` and `pitchColor`.
 
-- Local dev (quick iter): run SPA in a static dev server and load the built content script into the browser as an unpacked extension.
-- Anki access: ensure AnkiDesktop running with AnkiConnect add-on enabled (default port 8765).
-- Debugging: use browser devtools for content script, and VS Code for TypeScript and Python debugging.
+- UI & Settings (`docs/user_view.md`)
+  - Settings persisted to localStorage/extension storage.
+  - Per-site decoration toggles and global defaults.
+
+- Packaging & Build
+  - SPA build artifact used as an extension content script (Manifest V3).
+  - Bazel used for build/test orchestration (targets to be added).
+
+## Data flows and privacy
+- All text processing, matching against known words, and comprehension scoring occur on the client.
+- Anki data is requested locally from AnkiConnect and may be cached locally in WordDB; user data is never uploaded by default.
+- Pitch data and other static resources are bundled with the extension or stored locally; no external CDNs are required.
+
+## Developer workflows (updated)
+- Run the SPA locally and load the build as an unpacked extension for manual testing of decoration flows.
+- Use `src/cli_download_srs.py` to exercise Anki-related utilities in the CLI context; CLI tools may use SQLite for local persistence.
+- Debug content scripts with browser devtools and TypeScript/Python in VS Code.
 
 Suggested local dev commands (examples to add to `docs/dev-setup.md` later):
 
 ```bash
-# run AnkiConnect-dependent utilities (example)
+# fetch Anki lists via CLI
 python3 src/cli_download_srs.py --host 127.0.0.1 --port 8765
 
-# build with Bazel (once targets are defined)
+# build (Bazel targets will be scaffolded)
 bazel build //src:web_app:bundle
 bazel run //tools:firebase_viewer_server
 ```
 
-## Bazel plan (scaffold ideas)
-- Create targets:
-  - `//src:web_app` — webapp build pipeline (npm toolchain rule that invokes rollup/webpack)
-  - `//tools:firebase_viewer_server` — python_binary for the firebase tool
-  - `//tests:unit` — node and python unit tests
+## Bazel plan (updated)
+- Priorities for initial Bazel targets:
+  - `//src:web_app` — SPA bundle for extension content script.
+  - `//src:unit_tests` — tokenization and decorator unit tests.
+  - `//tools:cli_tools` — python binaries like `cli_download_srs.py`.
 
-Notes: Bazel setup will require adding `WORKSPACE` and minimal `BUILD.bazel` files; we will scaffold these later if you want.
+Scaffolding notes: add `WORKSPACE`, minimal `BUILD.bazel` files for the above targets; prefer small, testable units for rapid CI feedback.
 
-## Project-specific conventions (discoverable from code)
-- Python CLI scripts use sqlite cursors in `src/cli_download_srs.py` and `tools/firebase_viewer_server.py` (pattern: `conn.cursor()` exists). Use `argparse` and `main()`.
-- Token parsing utilities are located under `src/lexor/` (see `parser.ts`) — prefer small, testable functions for token boundaries.
-- Keep Anki network code separate from UI code; use a thin client module that exposes pure functions returning lists/sets.
+## Project-specific conventions (reminder)
+- Keep Anki network logic isolated behind a thin client API.
+- Tokenization helpers return the agreed token shape.
+- All persistent data default to local storage mechanisms; remote sync is opt-in and isolated.
 
-## Open questions / design decisions to resolve
-1. Pitch data source: **Ensure all pitch data is stored locally**. Avoid external APIs unless absolutely necessary.
-2. Furigana rendering strategy: semantic <ruby>/<rt> elements vs visually positioned overlays—accessibility concerns?
-3. Exact heuristic for "known" vs "learning" vs "new" from Anki data (use note/field names? tags?).
-4. How to handle multiword expressions and token alignment between kuromoji and Intl.Segmenter.
-5. Offline behavior: what features must work when Anki is unreachable?
-6. Privacy: will any content, words, or user data be uploaded to a backend? Default: no.
-
-## Data contracts / shapes (proposed)
-- Token
-  - {
-    surface: string,
-    reading: string, // kana
-    lemma: string,
-    pos: string,
-    start: number,
-    end: number
-  }
-
-- Pitch record
-  - {
-    patternId: string,
-    pitchColor: string,
-    examples: [string]
-  }
-
-- Anki word list response: array of strings (kanji or kana key) and optional metadata {status: "known"|"learning"|"new"}
-
-## Security & privacy notes
-- **Ensure all functionality is client-side.** Avoid external CDNs or databases.
-- Do not upload user-specific Anki decks or contents to external servers without explicit consent.
-- Keep defaults local-only; add opt-in remote sync in a separate component.
+## Open questions / decisions to resolve (updated)
+1. How will pitch DB updates be handled for improvements (automatic updater vs user-installed updates)?
+2. Furigana rendering: prefer semantic `<ruby>` by default; confirm fallback UX for sites that break layout.
+3. Comprehension UX: what thresholds trigger "fully-known" sentence highlighting vs "mostly-known" suggestions?
+4. Offline fallback: if AnkiConnect is unreachable, should the extension still run in read-only mode using cached WordDB?
+5. Security: sign extension packages and document how to add user-provided pitch files safely.
 
 ## Files to inspect / update first
-- `src/lexor/parser.ts`
-- `src/parser.ts`
-- `src/cli_download_srs.py`
-- `tools/firebase_viewer_server.py`
+- `docs/` — read the per-component docs (listed above).
+- `src/lexor/parser.ts` and `src/parser.ts` — tokenization examples.
+- `src/cli_download_srs.py` — Anki CLI patterns.
+- `tools/firebase_viewer_server.py` — optional backend utility.
 
 ## Next steps (short-term)
-1. Review and answer the Open Questions above.
-2. Scaffold `docs/dev-setup.md` with Bazel `WORKSPACE`/`BUILD` plan and AnkiConnect usage examples.
-3. Create a minimal Bazel `WORKSPACE` and `BUILD.bazel` skeleton for `//tools:firebase_viewer_server` and `//src:web_app`.
-4. Produce a concise `.github/copilot-instructions.md` update that references this doc.
+1. Finalize the Comprehension Calculator scoring formula and UX thresholds.
+2. Scaffold `docs/dev-setup.md` with Bazel `WORKSPACE`/`BUILD.bazel` plan, AnkiConnect examples, and extension load steps.
+3. Add Bazel `WORKSPACE` and minimal `BUILD.bazel` files for `//src:web_app`, `//src:unit_tests`, and `//tools:cli_tools`.
+4. Implement small unit tests for token shapes and an Anki client JSON-RPC formatter.
+5. Create packaging checklist for extension submission (manifest, icons, permissions) and privacy documentation.
 
 ## Requirements checklist (mapped to this doc)
-- [x] Master design doc created and placed in `docs/master_design.md`.
-- [x] Components and responsibilities listed (Tokenizer, Annotator, Anki, Pitch DB, UI, Backend).
-- [x] Open questions enumerated for design decisions.
-- [x] Mermaid diagram of high-level architecture included.
-- [x] Developer workflows and Bazel plan sketched.
+- [x] Master design doc updated and placed in `docs/master_design.md`.
+- [x] Client-side-first constraint emphasized.
+- [x] Extension behavior clarified: decorations applied only when user enables them.
+- [x] Comprehension Calculator included in the architecture and component index.
+- [x] Component-level docs linked from this master doc.
+
 
 If you'd like, I will now scaffold `docs/dev-setup.md` with example Bazel `WORKSPACE` and `BUILD.bazel` skeletons and an initial `.github/copilot-instructions.md` merge referencing this doc. Which one should I do next?
