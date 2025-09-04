@@ -1,7 +1,55 @@
+```markdown
+# Comprehension Calculator — Design
+
+Purpose
+- Compute page- and sentence-level comprehension metrics from parsed tokens and the WordDB, and surface n+1 sentences for mining.
+
+Status (repo snapshot)
+- Algorithm and pseudocode exist in previous docs; no reference implementation in this snapshot. This doc formalizes requirements and success criteria.
+
+Success criteria
+- SC1: Reference implementation `computeComprehension(sentences, wordDB)` returns the documented `ComprehensionReport` and reproduces the example calculation in tests.
+- SC2: n+1 detection works on synthetic tests and identifies the unknown token reliably.
+
+Requirements
+- R1: Implement deterministic scoring using configurable `posWeights` and `statusScores`.
+- R2: Support incremental computation (viewport-first) and cached WordDB lookups.
+- R3: Provide clear category thresholds configurable via settings.
+
+Interfaces
+- `computeComprehension(sentences, wordDB, options) -> ComprehensionReport`
+- `ComprehensionReport` shape documented in this repo; keep backwards-compatible changes.
+
+Timeline
+- Week 0–1: Implement core scoring function and unit tests with example sentences.
+- Week 1–2: Add incremental/viewport-first API and performance tests.
+
+Alternatives
+- A: Sentence-level scoring only — simpler but less stable for mixed-length pages.
+- B: Token-level scoring (preferred) — more stable; already described in pseudocode.
+
+Testing & validation
+- Unit tests for scoring math and category thresholds.
+- Integration test using harness: compute comprehension for sample HTML and verify decorator highlights.
+
+Performance targets
+- Compute comprehension for 1k tokens in < 500ms with in-memory cache on a dev machine.
+
+Implementation hints
+- Cache WordDB lookups in a Map during a page run.
+- Expose configuration for POS-to-weight mapping to allow tuning later.
+
+Open questions
+- Should the ComprehensionReport include token-level explanations for UX (e.g., top unknown tokens per sentence)? Recommended: yes, include a `highlights` section.
+
+```
 # Comprehension Calculator
 
 ## Purpose
 The Comprehension Calculator provides users with insights into how much of a webpage they understand based on their known words and sentences. It highlights areas of the page that are fully understood, partially understood, or unknown and surfaces n+1 sentences for mining.
+
+## Status (repo snapshot)
+- The scoring algorithm and pseudocode are documented. There is no reference implementation in the repository snapshot. Add a reference `src/ref/comprehension.js` and unit tests to lock down the contract and defaults.
 
 ## Responsibilities
 - Analyze tokenized webpage content to calculate the percentage of known words and sentences.
