@@ -1,28 +1,28 @@
 /* Additional styles for Chimichan MVP */
 body {
-  background-color: #f4f4f9;
+    background-color: #f4f4f9;
 }
 
 #app {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 20px;
-  background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    background: #fff;
 }
 
 textarea:focus {
-  outline: 2px solid #007BFF;
+    outline: 2px solid #007BFF;
 }
 
 div {
-  border-radius: 4px;
+    border-radius: 4px;
 }
 
 #output {
-  color: #333;
+    color: #333;
 }
 
 #intermediate {
-  font-family: monospace;
-  color: #555;
+    font-family: monospace;
+    color: #555;
 }

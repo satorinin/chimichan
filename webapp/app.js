@@ -1,32 +1,58 @@
-// Chimichan MVP App Logic
+// Chimichan MVP App Logic (browser-friendly)
 
 const inputElement = document.getElementById('input');
 const outputElement = document.getElementById('output');
 const intermediateElement = document.getElementById('intermediate');
 
-inputElement.addEventListener('input', () => {
-    const text = inputElement.value;
+function isWhitespace(str) { return /^\s+$/.test(str); }
 
-    // Simulate intermediate parsing results
-    const intermediateResults = parseText(text);
-    intermediateElement.textContent = JSON.stringify(intermediateResults, null, 2);
-
-    // Simulate decorated output
-    const decoratedOutput = decorateText(intermediateResults);
-    outputElement.innerHTML = decoratedOutput;
-});
-
-function parseText(text) {
-    // Placeholder for actual parsing logic
-    return text.split('').map((char, index) => ({
-        surface: char,
-        pos: 'unknown',
-        reading: char,
-        index
-    }));
+function localParse(text) {
+  const t = (text || '').normalize('NFC');
+  const tokens = [];
+  if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+    const seg = new Intl.Segmenter('ja', { granularity: 'word' });
+    for (const s of seg.segment(t)) {
+      const surface = s.segment;
+      const start = s.index;
+      const end = start + surface.length;
+      if (surface.length === 0) continue;
+      if (isWhitespace(surface)) continue;
+      const meta = (typeof window !== 'undefined' && typeof window.morphTokenize === 'function') ? window.morphTokenize(surface) : { reading: surface, lemma: surface, pos: 'UNK' };
+      tokens.push(Object.assign({ surface, start, end }, meta));
+    }
+    return tokens;
+  }
+  const re = /\S+/g; let m;
+  while ((m = re.exec(t)) !== null) {
+    const surface = m[0]; const start = m.index; const end = start + surface.length;
+    const meta = (typeof window !== 'undefined' && typeof window.morphTokenize === 'function') ? window.morphTokenize(surface) : { reading: surface, lemma: surface, pos: 'UNK' };
+    tokens.push(Object.assign({ surface, start, end }, meta));
+  }
+  return tokens;
 }
 
 function decorateText(tokens) {
-    // Placeholder for actual decoration logic
-    return tokens.map(token => `<span>${token.surface}</span>`).join('');
+  return tokens.map(token => {
+    const color = token.pos === 'UNK' ? '#d9534f' : '#5cb85c';
+    return `<span title="${token.reading}" style="color:${color}; padding:0 2px">${token.surface}</span>`;
+  }).join('');
 }
+
+function renderForText(text) {
+  const tokens = localParse(text);
+  intermediateElement.textContent = JSON.stringify(tokens, null, 2);
+  outputElement.innerHTML = decorateText(tokens);
+}
+
+inputElement.addEventListener('input', () => renderForText(inputElement.value));
+
+// Re-render when kuromoji becomes available
+if (typeof window !== 'undefined') {
+  window.addEventListener('kuromoji-ready', () => {
+    renderForText(inputElement.value);
+  });
+}
+
+// Initialize with sample text
+inputElement.value = 'これはテストです。';
+renderForText(inputElement.value);

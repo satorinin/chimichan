@@ -2,7 +2,7 @@
 const ankiSyncer = require('../src/anki_syncer');
 
 describe('Anki Syncer Module', () => {
-  test('should sync with Anki', () => {
-    expect(() => ankiSyncer.sync()).not.toThrow();
-  });
+    test('should sync with Anki', () => {
+        expect(() => ankiSyncer.sync()).not.toThrow();
+    });
 });
